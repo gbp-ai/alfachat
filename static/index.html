@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>AlfaChat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #header {
+            background: #111;
+            border-bottom: 1px solid #0f0;
+            padding: 8px 16px;
+            text-align: center;
+        }
+        #header h1 {
+            color: #0f0;
+            font-size: 20px;
+            text-shadow: 0 0 10px #0f0;
+        }
+        #header span {
+            color: #666;
+            font-size: 11px;
+        }
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .msg {
+            margin-bottom: 4px;
+            word-wrap: break-word;
+        }
+        .msg .time { color: #666; }
+        .msg .user { color: #ff0; }
+        .msg .text { color: #0f0; }
+        .msg.system { color: #0aa; font-style: italic; }
+        #input-area {
+            background: #111;
+            border-top: 1px solid #0f0;
+            padding: 12px 16px;
+            display: flex;
+            gap: 8px;
+        }
+        input {
+            background: #000;
+            border: 1px solid #0f0;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            padding: 8px;
+            outline: none;
+        }
+        input:focus { box-shadow: 0 0 5px #0f0; }
+        #username { width: 120px; }
+        #message { flex: 1; }
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:hover { background: #0a0; }
+        #messages::-webkit-scrollbar { width: 8px; }
+        #messages::-webkit-scrollbar-track { background: #111; }
+        #messages::-webkit-scrollbar-thumb { background: #0f0; }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>[ AlfaChat ]</h1>
+        <span>retour aux sources • v0.1.0</span>
+    </div>
+    <div id="messages"></div>
+    <div id="input-area">
+        <input type="text" id="username" placeholder="pseudo" maxlength="16">
+        <input type="text" id="message" placeholder="message..." autofocus>
+        <button onclick="send()">SEND</button>
+    </div>
+
+    <script>
+        const messages = document.getElementById('messages');
+        const usernameInput = document.getElementById('username');
+        const messageInput = document.getElementById('message');
+        
+        // Load saved username
+        usernameInput.value = localStorage.getItem('alfachat_user') || '';
+        
+        const ws = new WebSocket(`ws://${location.host}/ws`);
+        
+        ws.onopen = () => {
+            addSystem('Connecté à AlfaChat');
+        };
+        
+        ws.onclose = () => {
+            addSystem('Déconnecté du serveur');
+        };
+        
+        ws.onmessage = (e) => {
+            const msg = JSON.parse(e.data);
+            addMessage(msg);
+        };
+        
+        function addMessage(msg) {
+            const div = document.createElement('div');
+            div.className = 'msg';
+            div.innerHTML = `<span class="time">[${msg.timestamp}]</span> <span class="user">&lt;${escapeHtml(msg.username)}&gt;</span> <span class="text">${escapeHtml(msg.content)}</span>`;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+        
+        function addSystem(text) {
+            const div = document.createElement('div');
+            div.className = 'msg system';
+            div.textContent = `*** ${text}`;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+        
+        function send() {
+            const username = usernameInput.value.trim() || 'anon';
+            const content = messageInput.value.trim();
+            if (!content) return;
+            
+            localStorage.setItem('alfachat_user', username);
+            
+            ws.send(JSON.stringify({ username, content, timestamp: '' }));
+            messageInput.value = '';
+        }
+        
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') send();
+        });
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
