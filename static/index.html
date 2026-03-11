@@ -25,23 +25,56 @@
             font-size: 20px;
             text-shadow: 0 0 10px #0f0;
         }
-        #header span {
-            color: #666;
-            font-size: 11px;
+        #header span { color: #666; font-size: 11px; }
+        
+        #main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
         }
+        
         #messages {
             flex: 1;
             overflow-y: auto;
             padding: 16px;
         }
-        .msg {
-            margin-bottom: 4px;
-            word-wrap: break-word;
+        
+        #userlist {
+            width: 150px;
+            background: #0a0a0a;
+            border-left: 1px solid #0f0;
+            padding: 8px;
+            overflow-y: auto;
         }
+        #userlist h3 {
+            color: #0f0;
+            font-size: 12px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        #userlist .user {
+            color: #0a0;
+            padding: 2px 0;
+            font-size: 12px;
+        }
+        #userlist .user.divine {
+            color: #f0f;
+            text-shadow: 0 0 5px #f0f;
+        }
+        #userlist .count {
+            color: #666;
+            font-size: 10px;
+            margin-top: 8px;
+        }
+        
+        .msg { margin-bottom: 4px; word-wrap: break-word; }
         .msg .time { color: #666; }
         .msg .user { color: #ff0; }
         .msg .text { color: #0f0; }
         .msg.system { color: #0aa; font-style: italic; }
+        .msg.mention { background: #001a00; }
+        .msg .mention-tag { color: #0ff; font-weight: bold; }
+        
         .msg.divine {
             font-size: 18px;
             padding: 8px 0;
@@ -51,24 +84,20 @@
         .msg.divine .user { color: #f0f; font-weight: bold; }
         .msg.divine .text { color: #fff; }
         .msg.divine .time { color: #a0a; }
-        .msg.divine::before {
-            content: '◈ ';
-            color: #f0f;
-        }
-        .msg.divine::after {
-            content: ' ◈';
-            color: #f0f;
-        }
+        .msg.divine::before { content: '◈ '; color: #f0f; }
+        .msg.divine::after { content: ' ◈'; color: #f0f; }
         @keyframes divine-pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.8; }
         }
+        
         #input-area {
             background: #111;
             border-top: 1px solid #0f0;
             padding: 12px 16px;
             display: flex;
             gap: 8px;
+            position: relative;
         }
         input {
             background: #000;
@@ -80,6 +109,7 @@
             outline: none;
         }
         input:focus { box-shadow: 0 0 5px #0f0; }
+        input:disabled { opacity: 0.5; }
         #username { width: 120px; }
         #message { flex: 1; }
         button {
@@ -92,6 +122,42 @@
             cursor: pointer;
         }
         button:hover { background: #0a0; }
+        button:disabled { background: #333; cursor: not-allowed; }
+        
+        #autocomplete {
+            position: absolute;
+            bottom: 60px;
+            left: 150px;
+            background: #111;
+            border: 1px solid #0f0;
+            display: none;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        #autocomplete .item {
+            padding: 4px 12px;
+            cursor: pointer;
+            color: #0f0;
+        }
+        #autocomplete .item:hover, #autocomplete .item.selected {
+            background: #0f0;
+            color: #000;
+        }
+        
+        #join-area {
+            padding: 12px 16px;
+            background: #111;
+            border-top: 1px solid #0f0;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        #join-error {
+            color: #f00;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+        
         #messages::-webkit-scrollbar { width: 8px; }
         #messages::-webkit-scrollbar-track { background: #111; }
         #messages::-webkit-scrollbar-thumb { background: #0f0; }
@@ -100,69 +166,214 @@
 <body>
     <div id="header">
         <h1>🌿 [ AlfaChat ] 🌿</h1>
-        <span>retour aux sources • v0.1.0</span>
+        <span>retour aux sources • v0.2.0</span>
     </div>
-    <div id="messages"></div>
-    <div id="input-area">
-        <input type="text" id="username" placeholder="pseudo" maxlength="16">
-        <input type="text" id="message" placeholder="message..." autofocus>
+    <div id="main">
+        <div id="messages"></div>
+        <div id="userlist">
+            <h3>Online</h3>
+            <div id="users"></div>
+            <div class="count"><span id="user-count">0</span> connected</div>
+        </div>
+    </div>
+    <div id="join-area">
+        <input type="text" id="username" placeholder="choose username..." maxlength="16">
+        <button id="join-btn" onclick="join()">JOIN</button>
+        <span id="join-error"></span>
+    </div>
+    <div id="input-area" style="display:none;">
+        <span id="my-username" style="color:#ff0;padding:8px;">???</span>
+        <input type="text" id="message" placeholder="message... (use @ to mention)" autofocus>
         <button onclick="send()">SEND</button>
+        <div id="autocomplete"></div>
     </div>
 
     <script>
-        const messages = document.getElementById('messages');
+        const messagesEl = document.getElementById('messages');
+        const usersEl = document.getElementById('users');
         const usernameInput = document.getElementById('username');
         const messageInput = document.getElementById('message');
+        const joinArea = document.getElementById('join-area');
+        const inputArea = document.getElementById('input-area');
+        const joinError = document.getElementById('join-error');
+        const autocomplete = document.getElementById('autocomplete');
+        const myUsernameEl = document.getElementById('my-username');
         
-        // Load saved username
+        let myUsername = null;
+        let users = [];
+        let acIndex = -1;
+        
         usernameInput.value = localStorage.getItem('alfachat_user') || '';
         
         const ws = new WebSocket(`ws://${location.host}/ws`);
         
-        ws.onopen = () => {
-            addSystem('Connecté à AlfaChat');
-        };
-        
+        ws.onopen = () => addSystem('Connecté à AlfaChat - Choisis un pseudo pour rejoindre');
         ws.onclose = () => {
             addSystem('Déconnecté du serveur');
+            myUsername = null;
+            joinArea.style.display = 'flex';
+            inputArea.style.display = 'none';
         };
         
         ws.onmessage = (e) => {
-            const msg = JSON.parse(e.data);
-            addMessage(msg);
+            const data = JSON.parse(e.data);
+            
+            if (data.msg_type === 'userlist') {
+                users = data.users;
+                renderUsers();
+            } else if (data.msg_type === 'join_response') {
+                if (data.success) {
+                    myUsername = usernameInput.value.trim().toLowerCase();
+                    localStorage.setItem('alfachat_user', myUsername);
+                    joinArea.style.display = 'none';
+                    inputArea.style.display = 'flex';
+                    myUsernameEl.textContent = '<' + myUsername + '>';
+                    messageInput.focus();
+                } else {
+                    joinError.textContent = data.error;
+                }
+            } else if (data.msg_type === 'system') {
+                addSystem(data.content);
+            } else {
+                addMessage(data);
+            }
         };
+        
+        function renderUsers() {
+            usersEl.innerHTML = '';
+            users.forEach(u => {
+                const div = document.createElement('div');
+                div.className = u.includes('georges') ? 'user divine' : 'user';
+                div.textContent = u;
+                usersEl.appendChild(div);
+            });
+            document.getElementById('user-count').textContent = users.length;
+        }
         
         function addMessage(msg) {
             const div = document.createElement('div');
             const isDivine = msg.username.toLowerCase().includes('georges');
-            div.className = isDivine ? 'msg divine' : 'msg';
-            div.innerHTML = `<span class="time">[${msg.timestamp}]</span> <span class="user">&lt;${escapeHtml(msg.username)}&gt;</span> <span class="text">${escapeHtml(msg.content)}</span>`;
-            messages.appendChild(div);
-            messages.scrollTop = messages.scrollHeight;
+            const isMention = myUsername && msg.content.toLowerCase().includes('@' + myUsername);
+            
+            let className = 'msg';
+            if (isDivine) className += ' divine';
+            if (isMention) className += ' mention';
+            div.className = className;
+            
+            const content = highlightMentions(escapeHtml(msg.content));
+            div.innerHTML = `<span class="time">[${msg.timestamp}]</span> <span class="user">&lt;${escapeHtml(msg.username)}&gt;</span> <span class="text">${content}</span>`;
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+        
+        function highlightMentions(text) {
+            return text.replace(/@(\w+)/g, '<span class="mention-tag">@$1</span>');
         }
         
         function addSystem(text) {
             const div = document.createElement('div');
             div.className = 'msg system';
             div.textContent = `*** ${text}`;
-            messages.appendChild(div);
-            messages.scrollTop = messages.scrollHeight;
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
         }
         
+        function join() {
+            const username = usernameInput.value.trim().toLowerCase();
+            if (!username) {
+                joinError.textContent = 'Username required';
+                return;
+            }
+            if (!/^[a-z0-9_]+$/.test(username)) {
+                joinError.textContent = 'Only a-z, 0-9, _ allowed';
+                return;
+            }
+            joinError.textContent = '';
+            ws.send(JSON.stringify({ username, msg_type: 'join' }));
+        }
+        
+        usernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') join();
+        });
+        
         function send() {
-            const username = usernameInput.value.trim() || 'anon';
             const content = messageInput.value.trim();
-            if (!content) return;
-            
-            localStorage.setItem('alfachat_user', username);
-            
-            ws.send(JSON.stringify({ username, content, timestamp: '' }));
+            if (!content || !myUsername) return;
+            ws.send(JSON.stringify({ username: myUsername, content, timestamp: '' }));
             messageInput.value = '';
+            hideAutocomplete();
         }
         
         messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') send();
+            if (e.key === 'Enter' && acIndex === -1) send();
         });
+        
+        messageInput.addEventListener('keydown', (e) => {
+            if (autocomplete.style.display === 'block') {
+                const items = autocomplete.querySelectorAll('.item');
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    acIndex = Math.min(acIndex + 1, items.length - 1);
+                    updateAcSelection(items);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    acIndex = Math.max(acIndex - 1, 0);
+                    updateAcSelection(items);
+                } else if (e.key === 'Enter' && acIndex >= 0) {
+                    e.preventDefault();
+                    selectAcItem(items[acIndex].textContent);
+                } else if (e.key === 'Escape') {
+                    hideAutocomplete();
+                }
+            }
+        });
+        
+        messageInput.addEventListener('input', () => {
+            const val = messageInput.value;
+            const match = val.match(/@(\w*)$/);
+            if (match) {
+                const search = match[1].toLowerCase();
+                const filtered = users.filter(u => u.startsWith(search) || search === '');
+                if (filtered.length > 0) {
+                    showAutocomplete(filtered);
+                } else {
+                    hideAutocomplete();
+                }
+            } else {
+                hideAutocomplete();
+            }
+        });
+        
+        function showAutocomplete(items) {
+            autocomplete.innerHTML = '';
+            items.forEach(u => {
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.textContent = u;
+                div.onclick = () => selectAcItem(u);
+                autocomplete.appendChild(div);
+            });
+            autocomplete.style.display = 'block';
+            acIndex = -1;
+        }
+        
+        function hideAutocomplete() {
+            autocomplete.style.display = 'none';
+            acIndex = -1;
+        }
+        
+        function updateAcSelection(items) {
+            items.forEach((item, i) => {
+                item.classList.toggle('selected', i === acIndex);
+            });
+        }
+        
+        function selectAcItem(username) {
+            const val = messageInput.value;
+            messageInput.value = val.replace(/@\w*$/, '@' + username + ' ');
+            hideAutocomplete();
+            messageInput.focus();
+        }
         
         function escapeHtml(text) {
             const div = document.createElement('div');
