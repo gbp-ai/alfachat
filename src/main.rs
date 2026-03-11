@@ -35,7 +35,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/ws", get(ws_handler))
-        .nest_service("/", ServeDir::new("static"))
+        .fallback_service(ServeDir::new("static"))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3333").await.unwrap();
