@@ -2,8 +2,8 @@ use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::State,
     response::IntoResponse,
-    routing::get,
-    Router,
+    routing::{get, post},
+    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -35,12 +35,48 @@ async fn main() {
 
     let app = Router::new()
         .route("/ws", get(ws_handler))
+        .route("/api/messages", get(get_messages))
+        .route("/api/messages", post(post_message))
         .fallback_service(ServeDir::new("static"))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3333").await.unwrap();
     println!("🦀 AlfaChat running on http://0.0.0.0:3333");
     axum::serve(listener, app).await.unwrap();
+}
+
+// GET /api/messages - return history
+async fn get_messages(State(state): State<Arc<AppState>>) -> Json<Vec<ChatMessage>> {
+    let history = state.history.read().await;
+    Json(history.iter().cloned().collect())
+}
+
+// POST /api/messages - send a message
+async fn post_message(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<ChatMessage>,
+) -> Json<ChatMessage> {
+    let msg = ChatMessage {
+        username: payload.username,
+        content: payload.content,
+        timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
+    };
+    
+    let json = serde_json::to_string(&msg).unwrap();
+    
+    // Add to history
+    {
+        let mut h = state.history.write().await;
+        h.push_back(msg.clone());
+        if h.len() > MAX_HISTORY {
+            h.pop_front();
+        }
+    }
+    
+    // Broadcast to WebSocket clients
+    let _ = state.tx.send(json);
+    
+    Json(msg)
 }
 
 async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
