@@ -13,7 +13,7 @@ use tower_http::services::ServeDir;
 use uuid::Uuid;
 
 const MAX_HISTORY: usize = 100;
-const WEBHOOK_URL: &str = "http://localhost:7007/hooks/alfachat";
+const WEBHOOK_URL: &str = "http://localhost:18789/hooks/alfachat?token=wh_G8kP2mNqR5vX9jL4tY7cF1bA3eD6";
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 struct ChatMessage {
