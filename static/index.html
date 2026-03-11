@@ -42,6 +42,27 @@
         .msg .user { color: #ff0; }
         .msg .text { color: #0f0; }
         .msg.system { color: #0aa; font-style: italic; }
+        .msg.divine {
+            font-size: 18px;
+            padding: 8px 0;
+            text-shadow: 0 0 10px #f0f, 0 0 20px #f0f;
+            animation: divine-pulse 2s infinite;
+        }
+        .msg.divine .user { color: #f0f; font-weight: bold; }
+        .msg.divine .text { color: #fff; }
+        .msg.divine .time { color: #a0a; }
+        .msg.divine::before {
+            content: '◈ ';
+            color: #f0f;
+        }
+        .msg.divine::after {
+            content: ' ◈';
+            color: #f0f;
+        }
+        @keyframes divine-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
         #input-area {
             background: #111;
             border-top: 1px solid #0f0;
@@ -113,7 +134,8 @@
         
         function addMessage(msg) {
             const div = document.createElement('div');
-            div.className = 'msg';
+            const isDivine = msg.username.toLowerCase().includes('georges');
+            div.className = isDivine ? 'msg divine' : 'msg';
             div.innerHTML = `<span class="time">[${msg.timestamp}]</span> <span class="user">&lt;${escapeHtml(msg.username)}&gt;</span> <span class="text">${escapeHtml(msg.content)}</span>`;
             messages.appendChild(div);
             messages.scrollTop = messages.scrollHeight;

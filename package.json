@@ -1,0 +1,24 @@
+{
+  "name": "alfachat",
+  "version": "1.0.0",
+  "description": "Retour aux sources. Un chat minimaliste style années 90.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gbp-ai/alfachat.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/gbp-ai/alfachat/issues"
+  },
+  "homepage": "https://github.com/gbp-ai/alfachat#readme",
+  "dependencies": {
+    "ws": "^8.19.0"
+  }
+}
